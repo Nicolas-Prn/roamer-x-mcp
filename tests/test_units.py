@@ -67,3 +67,27 @@ def test_policy_check():
             r.check_policy(pol, start, end)
     with pytest.raises(ValueError, match="too far ahead"):
         r.check_policy(pol, start + timedelta(days=10), start + timedelta(days=10, hours=1))
+
+
+def test_json_merge_add_and_remove(tmp_path):
+    import json
+    from roamer_x_mcp import cli
+    path = tmp_path / "mcp.json"
+    path.write_text(json.dumps({"mcpServers": {"other": {"command": "x"}}}))
+    cli._json_merge(path, ["/bin/roamer-x-mcp", "serve"])
+    data = json.loads(path.read_text())
+    assert data["mcpServers"]["roamer-x"] == {"command": "/bin/roamer-x-mcp", "args": ["serve"]}
+    assert "other" in data["mcpServers"]
+    cli._json_merge(path, None)
+    assert "roamer-x" not in json.loads(path.read_text())["mcpServers"]
+
+
+def test_codex_table_is_replaced(tmp_path, monkeypatch):
+    from roamer_x_mcp import cli
+    monkeypatch.setattr(cli.Path, "home", lambda: tmp_path)
+    (tmp_path / ".codex").mkdir()
+    (tmp_path / ".codex/config.toml").write_text('[mcp_servers.moodle]\ncommand = "m"\n')
+    cli._codex(["/a", "serve"])
+    cli._codex(["/b", "serve"])
+    text = (tmp_path / ".codex/config.toml").read_text()
+    assert text.count('[mcp_servers."roamer-x"]') == 1 and '"/b"' in text and "[mcp_servers.moodle]" in text

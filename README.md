@@ -1,7 +1,6 @@
 # roamer-x-mcp
 
-> **Work in progress.** Sign-in, search, booking and cancellation work (verified on the ULB/VUB tenant);
-> client registration (`install`) is still to do.
+> Early version: sign-in, search, booking and cancellation are verified on the ULB/VUB tenant.
 
 Let your AI assistant book rooms for you through **Roamer X**, the app ULB and VUB use for the
 [LIC building](https://www.lic.brussels/book-a-space). Ask things like:
@@ -19,16 +18,31 @@ Made for the ULB/VUB tenant (`uob`, the default), but it should work with any IB
 
 ## Install
 
+**1. Install [uv](https://docs.astral.sh/uv/)** if you do not have it:
+`curl -LsSf https://astral.sh/uv/install.sh | sh` (macOS / Linux), then open a new terminal.
+
+**2. Install roamer-x-mcp and sign in**
+
 ```sh
 uv tool install git+https://github.com/Nicolas-Prn/roamer-x-mcp
 roamer-x-mcp login
 ```
 
-`login` opens a browser window on the IBSS Hub where you sign in with your university account (Microsoft).
-The session is kept in a dedicated browser profile under `~/.config/roamer-x-mcp/`; the server renews the
-API token (valid about an hour) by reopening the Hub in the background. Your password is never seen or
-stored. It uses your installed Google Chrome, or Playwright's Chromium (`uvx playwright install chromium`).
-Run `login` again if the Microsoft session expires.
+`login` opens a browser window on the IBSS Hub where you sign in with your university account (Microsoft),
+then offers to register the server in every AI app it finds: Claude Code, Claude Desktop, Codex, Cursor,
+Gemini CLI, Windsurf and [OpenClaw](https://openclaw.ai). Restart open desktop apps afterwards.
+
+- The session is kept in a dedicated browser profile under `~/.config/roamer-x-mcp/`. The API token lasts
+  about an hour; the server renews it in the background by reopening the Hub headless, and signs in again
+  silently with Microsoft's "stay signed in" cookie when the Hub session has expired. Your password is never
+  seen or stored. Run `login` again if Microsoft asks for your password or MFA.
+- Browser: your installed Google Chrome, else a system Chromium (`/usr/bin/chromium`, e.g. on a Raspberry
+  Pi), else Playwright's (`uvx playwright install chromium`).
+- Headless machine (server, Raspberry Pi): `login` needs a window once. Run it over SSH with X forwarding
+  (`ssh -X host`, with XQuartz on macOS) or from the machine's desktop session.
+
+Other commands: `roamer-x-mcp install [client…]` / `uninstall [client…]` to (un)register the server,
+`roamer-x-mcp status` to check the connection and see detected apps.
 
 ## Tools
 
