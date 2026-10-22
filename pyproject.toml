@@ -1,0 +1,26 @@
+[project]
+name = "roamer-x-mcp"
+version = "0.1.0"
+description = "MCP server letting AI assistants (Claude, Codex, Cursor...) book rooms through your Roamer X (ICONICS IBSS) account."
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Nicolas Pruneau" }]
+requires-python = ">=3.10"
+keywords = ["mcp", "roamer", "iconics", "ibss", "room-booking", "claude", "ai", "university"]
+dependencies = [
+    "mcp>=2.3.0,<3",
+    "playwright>=1.48",
+]
+
+[project.scripts]
+roamer-x-mcp = "roamer_x_mcp.cli:main"
+
+[project.urls]
+Repository = "https://github.com/Nicolas-Prn/roamer-x-mcp"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["uv_build>=0.13.1,<0.14.0"]
+build-backend = "uv_build"
