@@ -18,6 +18,8 @@ from __future__ import annotations
 
 import base64
 import json
+import os
+import shutil
 import subprocess
 import sys
 import time
@@ -48,13 +50,21 @@ def is_fresh(token: str | None) -> bool:
 
 
 def _launch(p, headless: bool):
+    """Persistent context on Google Chrome, else a system Chromium (e.g. Raspberry Pi), else Playwright's."""
     kwargs = dict(user_data_dir=str(PROFILE_DIR), headless=headless, viewport={"width": 1280, "height": 860})
     PROFILE_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
     try:
         return p.chromium.launch_persistent_context(channel="chrome", **kwargs)
     except Exception:
-        # No Google Chrome installed: fall back to Playwright's Chromium (`playwright install chromium`).
-        return p.chromium.launch_persistent_context(**kwargs)
+        pass
+    system = next((shutil.which(n) for n in ("chromium", "chromium-browser") if shutil.which(n)), None)
+    if system:
+        return p.chromium.launch_persistent_context(executable_path=system, **kwargs)
+    return p.chromium.launch_persistent_context(**kwargs)  # needs `playwright install chromium`
+
+
+def can_open_window() -> bool:
+    return sys.platform != "linux" or bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
 
 
 def _read_token(page) -> str | None:
