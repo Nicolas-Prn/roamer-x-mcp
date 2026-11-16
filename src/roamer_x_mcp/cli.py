@@ -193,6 +193,22 @@ def cmd_install(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_observe(args: argparse.Namespace) -> int:
+    from datetime import datetime
+    from .booking import Roamer
+    from . import observe
+    r = Roamer(Ibss(config.load()))
+    building = r.building(args.building_id)
+    wanted = observe.targets(datetime.now(building.tz).date(), observe.parse_offsets(args.offsets),
+                             [observe.parse_slot(s) for s in args.slot or ["09:00-10:30"]])
+    records = observe.run(r, building, wanted, args.space_type, Path(args.log) if args.log else observe.DEFAULT_LOG)
+    for rec in records:
+        detail = (f"{len(rec['eligible'])} eligible / {rec['free_total']} free"
+                  if rec["ok"] else f"error ({rec['error_kind']}): {rec['error']}")
+        print(f"{rec['date']} {rec['start']}–{rec['end']} (+{rec['offset_days']}d): {detail}")
+    return 0 if any(rec["ok"] for rec in records) else 1
+
+
 def cmd_serve(args: argparse.Namespace) -> int:
     from .server import run
     run()
@@ -216,6 +232,13 @@ def main(argv: list[str] | None = None) -> int:
         i.set_defaults(fn=cmd_install)
     sub.add_parser("status", help="check the connection and show detected apps").set_defaults(fn=cmd_status)
     sub.add_parser("serve", help="run the MCP server (stdio); AI clients launch this").set_defaults(fn=cmd_serve)
+    o = sub.add_parser("observe", help="read-only: log which bookable rooms are free, to learn release times")
+    o.add_argument("--offsets", default="0-8", help="days from today, e.g. 0-8 or 6,7,8 (default: 0-8)")
+    o.add_argument("--slot", action="append", default=None, help="HH:MM-HH:MM, repeatable (default: 09:00-10:30)")
+    o.add_argument("--space-type", default="MeetingRoom")
+    o.add_argument("--building-id", type=int, default=None)
+    o.add_argument("--log", default=None, help="JSON Lines log (default: <config dir>/observe.jsonl)")
+    o.set_defaults(fn=cmd_observe)
 
     args = parser.parse_args(argv)
     if not getattr(args, "fn", None):

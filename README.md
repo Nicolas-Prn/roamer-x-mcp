@@ -56,6 +56,25 @@ Other commands: `roamer-x-mcp install [client…]` / `uninstall [client…]` to 
 | `cancel_booking` | Cancels one of your bookings |
 | `connection_status` | Checks the connection |
 
+## Availability observer
+
+`roamer-x-mcp observe` is a read-only command (it never books) that records which rooms bookable without
+staff approval are free for a few dates relative to today, one JSON line per date and slot in
+`~/.config/roamer-x-mcp/observe.jsonl`. Run it on a timer to learn when rooms are released and how fast they
+are taken:
+
+```sh
+roamer-x-mcp observe --offsets 0-8 --slot 09:00-10:30 --slot 13:30-15:15
+```
+
+Each line holds `observed_at`, `date`, `start`, `end`, `offset_days`, `free_total` and the `eligible` rooms
+(id, capacity, policy, booking horizon), or `ok: false` with an `error_kind` (`auth`, `login_required`,
+`unreachable`, `api_error`). Keep the interval reasonable (10–15 min): every target is one API search.
+
+Token refreshes are serialized across processes (MCP server, observer, CLI) with a lock file in the config
+directory, because they share one browser profile; a process that waited for another's refresh reuses the
+new token instead of refreshing again.
+
 ## Development
 
 ```sh
