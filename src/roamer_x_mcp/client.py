@@ -53,7 +53,7 @@ class Ibss:
         return self._token
 
     def _refresh(self) -> None:
-        auth.refresh_in_subprocess()
+        auth.refresh_in_subprocess(stale_token=self._token)
         self._token = config.load().token
 
     def _scrub(self, text: str) -> str:

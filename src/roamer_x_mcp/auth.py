@@ -17,6 +17,7 @@ subprocess: `python -m roamer_x_mcp.auth refresh`.
 from __future__ import annotations
 
 import base64
+import contextlib
 import json
 import os
 import shutil
@@ -27,6 +28,7 @@ import time
 from . import config
 
 PROFILE_DIR = config.HOME / "browser"
+REFRESH_LOCK = config.HOME / "refresh.lock"
 # Renew a bit before expiry so a token never dies in the middle of a tool call.
 MIN_VALIDITY_S = 5 * 60
 
@@ -158,11 +160,44 @@ def browser_token(tenant: str, interactive: bool, email: str = "") -> str:
     return token
 
 
-def refresh_in_subprocess() -> None:
-    """Renew the stored token headlessly (used by the MCP server)."""
-    res = subprocess.run(
-        [sys.executable, "-m", "roamer_x_mcp.auth", "refresh"], capture_output=True, text=True, timeout=120
-    )
+@contextlib.contextmanager
+def refresh_lock(timeout_s: float = 150):
+    """Serialize refreshes across processes (MCP server, sniper, CLI): they share one browser profile,
+    which Chromium refuses to open twice."""
+    try:
+        import fcntl
+    except ImportError:  # Windows: no cross-process lock, refreshes are rare enough there
+        yield
+        return
+    config.HOME.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with open(REFRESH_LOCK, "a") as f:
+        deadline = time.monotonic() + timeout_s
+        while True:
+            try:
+                fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() > deadline:
+                    raise LoginRequiredError("token refresh already running for too long in another process")
+                time.sleep(0.5)
+        try:
+            yield
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
+
+
+def refresh_in_subprocess(stale_token: str | None = None) -> None:
+    """Renew the stored token headlessly, unless another process already did while we waited for the lock.
+
+    stale_token: the token the caller found expired or rejected; any other fresh stored token is accepted.
+    """
+    with refresh_lock():
+        stored = config.load(require_token=False).token
+        if stored != stale_token and is_fresh(stored):
+            return
+        res = subprocess.run(
+            [sys.executable, "-m", "roamer_x_mcp.auth", "refresh"], capture_output=True, text=True, timeout=120
+        )
     if res.returncode != 0:
         message = res.stderr.strip().splitlines()[-1] if res.stderr.strip() else "token refresh failed"
         raise LoginRequiredError(message)
